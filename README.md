@@ -4,6 +4,10 @@ An Instagram-style photo-sharing web app built with plain HTML, CSS and JavaScri
 
 ## Run it
 
+**Easiest (works on phones too):** download just `lolgram.html` and open it — it's a single self-contained file.
+
+Or, with the whole folder:
+
 Open `index.html` in a browser, or serve the folder:
 
 ```sh
@@ -31,5 +35,6 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 | `style.css` | All styling, themes and responsive breakpoints |
 | `data.js` | Fictional seed users, posts, stories and notifications |
 | `app.js` | Router, rendering, state and interactions |
+| `lolgram.html` | Single-file build of all of the above (regenerate after edits) |
 
 Sample photos come from [picsum.photos](https://picsum.photos); if they can't load, a gradient placeholder is shown.
