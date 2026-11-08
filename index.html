@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lolgram</title>
+  <meta name="description" content="A photo-sharing web app inspired by Instagram, built with plain HTML, CSS and JavaScript." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Desktop / tablet side navigation -->
+  <nav class="sidenav" aria-label="Main">
+    <a href="#/" class="brand">Lolgram</a>
+    <a href="#/" class="brand-mini" aria-label="Home">L</a>
+    <ul>
+      <li><a href="#/" data-nav="home"><span class="ico" data-icon="home"></span><span class="lbl">Home</span></a></li>
+      <li><button type="button" data-action="search"><span class="ico" data-icon="search"></span><span class="lbl">Search</span></button></li>
+      <li><a href="#/explore" data-nav="explore"><span class="ico" data-icon="explore"></span><span class="lbl">Explore</span></a></li>
+      <li><button type="button" data-action="notifications"><span class="ico" data-icon="heart"></span><span class="lbl">Notifications</span></button></li>
+      <li><button type="button" data-action="create"><span class="ico" data-icon="plus"></span><span class="lbl">Create</span></button></li>
+      <li><a href="#/profile/me" data-nav="profile"><img class="avatar xs" data-me-avatar alt="" /><span class="lbl">Profile</span></a></li>
+    </ul>
+    <button type="button" class="theme-toggle" data-action="theme"><span class="ico" data-icon="moon"></span><span class="lbl">Switch appearance</span></button>
+  </nav>
+
+  <!-- Mobile top bar -->
+  <header class="topbar">
+    <a href="#/" class="brand">Lolgram</a>
+    <div class="topbar-actions">
+      <button type="button" data-action="search" aria-label="Search"><span class="ico" data-icon="search"></span></button>
+      <button type="button" data-action="notifications" aria-label="Notifications"><span class="ico" data-icon="heart"></span></button>
+    </div>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <!-- Mobile bottom navigation -->
+  <nav class="bottomnav" aria-label="Main mobile">
+    <a href="#/" data-nav="home" aria-label="Home"><span class="ico" data-icon="home"></span></a>
+    <a href="#/explore" data-nav="explore" aria-label="Explore"><span class="ico" data-icon="explore"></span></a>
+    <button type="button" data-action="create" aria-label="Create"><span class="ico" data-icon="plus"></span></button>
+    <button type="button" data-action="theme" aria-label="Switch appearance"><span class="ico" data-icon="moon"></span></button>
+    <a href="#/profile/me" data-nav="profile" aria-label="Profile"><img class="avatar xs" data-me-avatar alt="" /></a>
+  </nav>
+
+  <!-- Slide-out panel (search / notifications) -->
+  <aside class="panel" id="panel" aria-hidden="true"></aside>
+
+  <!-- Modal root -->
+  <div class="modal-backdrop" id="modal" hidden></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
