@@ -357,6 +357,46 @@ def build_808(events):
     return y * amp
 
 
+def codec_safe(mix, work, ceiling=10 ** (-1.0 / 20), rounds=4):
+    """Closed-loop true-peak guard: encode to AAC like the final mux, decode, and pull down
+    any 25 ms window whose decoded peak overshoots the ceiling."""
+    import subprocess
+    tmp_wav = os.path.join(work, "_tp.wav")
+    tmp_m4a = os.path.join(work, "_tp.m4a")
+    win = int(0.025 * SR)
+    for _ in range(rounds):
+        write_wav(tmp_wav, mix)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp_wav, "-c:a", "aac", "-b:a", "320k",
+                        tmp_m4a], check=True)
+        dec = subprocess.run(["ffmpeg", "-v", "error", "-i", tmp_m4a, "-f", "f32le", "-ac", "2",
+                              "-ar", str(SR), "-"], check=True, capture_output=True).stdout
+        d = np.frombuffer(dec, dtype=np.float32).reshape(-1, 2)[:len(mix)]
+        pk = np.abs(d).max(axis=1)
+        nwin = len(pk) // win
+        wp = pk[:nwin * win].reshape(nwin, win).max(axis=1)
+        if wp.max() <= ceiling:
+            break
+        gw = np.minimum(1.0, ceiling / np.maximum(wp, 1e-9)) ** 1.1
+        gw = np.minimum(gw, np.r_[gw[1:], 1.0])
+        gw = np.minimum(gw, np.r_[1.0, gw[:-1]])
+        centers = (np.arange(nwin) + 0.5) * win
+        g = np.interp(np.arange(len(mix)), centers, gw)
+        mix = mix * g[:, None]
+    for f in (tmp_wav, tmp_m4a):
+        if os.path.exists(f):
+            os.remove(f)
+    return mix
+
+
+def write_wav(path, mix):
+    pcm = (np.clip(mix, -1, 1) * 32767).astype("<i2")
+    with wave.open(path, "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(pcm.tobytes())
+
+
 def main(work):
     orig = load_orig(work)
     music = np.zeros((N, 2))
@@ -399,10 +439,14 @@ def main(work):
             return 650
         if t < TL.T_GROOVE:
             return 650 * (12000 / 650) ** ((t - TL.T_TAP1) / (TL.T_GROOVE - TL.T_TAP1))
-        if TL.T_HERO <= t < TL.T_BREAK_END:
+        if TL.T_HERO - 0.08 <= t < TL.T_HERO:
+            return 15000 * (1800 / 15000) ** ((t - TL.T_HERO + 0.08) / 0.08)
+        if TL.T_HERO <= t < TL.T_BREAK_END - 0.15:
             return 1800
+        if TL.T_BREAK_END - 0.15 <= t < TL.T_BREAK_END:
+            return 1800 * (15000 / 1800) ** ((t - TL.T_BREAK_END + 0.15) / 0.15)
         return 15000
-    cb = tv_filter(cb, "lowpass", cb_lp)
+    cb = tv_filter(cb, "lowpass", cb_lp, block=64)
     def cb_hp(t):
         if TL.T_BUILD <= t < TL.T_GAP:
             return 40 * (900 / 40) ** ((t - TL.T_BUILD) / (TL.T_GAP - TL.T_BUILD))
@@ -646,27 +690,27 @@ def main(work):
     rms = np.sqrt(np.mean(mix[d0:d1] ** 2))
     mix *= 10 ** (-8.5 / 20) / rms
     mix = np.tanh(mix * 1.05) / 1.05 * 1.0
-    ceiling = 10 ** (-1.0 / 20)
-    peak = np.abs(mix).max(axis=1)
-    from scipy.ndimage import maximum_filter1d
-    la = int(0.002 * SR)
-    pk = maximum_filter1d(peak, size=2 * la + 1)
+    # band-limit, then a true-peak (4x oversampled) look-ahead limiter
+    mix = filt(mix, "lowpass", 17500, 4)
+    ceiling = 10 ** (-1.5 / 20)
+    from scipy.ndimage import maximum_filter1d, minimum_filter1d
+    up = signal.resample_poly(mix, 4, 1, axis=0)
+    tp = np.abs(up).max(axis=1)[:len(mix) * 4].reshape(-1, 4).max(axis=1)
+    la = int(0.003 * SR)
+    pk = maximum_filter1d(tp, size=2 * la + 1)
     g = np.minimum(1.0, ceiling / np.maximum(pk, 1e-9))
-    g = signal.lfilter([1 - 0.995], [1, -0.995], np.r_[g[:1].repeat(1), g])[1:]
-    g = np.minimum(g, np.minimum(1.0, ceiling / np.maximum(pk, 1e-9)) * 1.0 + 0.0)
+    g = minimum_filter1d(g, size=2 * la + 1)
+    g = signal.lfilter([1 - 0.996], [1, -0.996], np.r_[g[:1].repeat(400), g])[400:]
+    g = np.minimum(g, np.minimum(1.0, ceiling / np.maximum(pk, 1e-9)))
     mix *= g[:, None]
     mix = np.clip(mix, -ceiling, ceiling)
     # fade at the very end
     fo = int(0.6 * SR)
     mix[-fo:] *= np.linspace(1, 0, fo)[:, None] ** 2
 
+    mix = codec_safe(mix, work)
     out = os.path.join(work, "mix.wav")
-    pcm = (mix * 32767).astype("<i2")
-    with wave.open(out, "wb") as w:
-        w.setnchannels(2)
-        w.setsampwidth(2)
-        w.setframerate(SR)
-        w.writeframes(pcm.tobytes())
+    write_wav(out, mix)
     print("wrote", out, f"peak={np.abs(mix).max():.3f}",
           f"drop rms={20*np.log10(np.sqrt(np.mean(mix[d0:d1]**2))):.1f} dBFS")
 
